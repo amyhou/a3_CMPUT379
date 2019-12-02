@@ -1,22 +1,24 @@
 #include "FileSystem.h"
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <iostream>
+#include <bitset>
+#include <vector>
 
 using namespace std;
 
 
-/* Questions
-    1. When updating the buffer, what should we do if input gives more than
-      1024 characters?
-*/
-
 /* MACROS */
-#define TRUE (1)
-#define FALSE (0)
 #define MAX_INPUT_LENGTH (4000)
 
 /* GLOBAL VARIABLES */
-uint8_t buffer[1024];
+uint8_t buffer[1024];   // buffer of 1KB
+int fsfd;              // file descriptor of emulator disk file currently mounted
+Super_block *superblock; // superblock of disk file currently mounted
+bool fsMounted = false;
 
 /* STRUCTURE DEFINITIONS */
 
@@ -39,12 +41,155 @@ void tokenize(char* str, const char* delim, char ** argv) {
   }
 }
 
+void bin(char n)
+{
+  // helper function that prints out a byte (8 bits) in hex
+
+  printf("0x%02x\n", n & 0xFF);
+}
+
 
 /* Required Functions */
 void fs_mount(char *new_disk_name)
 {
   // Check for file existence in current directory
+  int fd = open(new_disk_name, O_RDWR);
 
+  if (fd < 0)
+  {
+    fprintf(stderr, "Error: Cannot find disk %s\n", new_disk_name);
+    return;
+  }
+
+  // Consistency checks
+  bool consistent = true;
+  Super_block tempSuperblock;
+  int inconsistency = 0;
+
+  read(fd, &(tempSuperblock), 128);
+  // bin(tempSuperblock.free_block_list[0]);
+  // bin(tempSuperblock.inode[0].name[0]);
+
+  /* CONSISTENCY CHECK 1 */
+  int freeByteCounter = 0;
+  bitset<8> curByte;
+  while (freeByteCounter < 128)
+  {
+    int modCount = freeByteCounter % 8;
+    if (modCount == 0)
+    {
+      cout << freeByteCounter / 8 << endl;
+      curByte = bitset<8>((unsigned char)tempSuperblock.free_block_list[freeByteCounter/8]);
+    }
+
+    int bitIdx = 7 - modCount;
+    cout << curByte[bitIdx] << endl;
+
+    // Superblock must not be free in free_block_list
+    if (freeByteCounter == 0)
+    {
+      if (curByte[bitIdx])
+      {
+        freeByteCounter++;
+        continue;
+      } else
+      {
+        consistent = false;
+        inconsistency = 1;
+        break;
+      }
+    }
+
+    // If not looking at superblock bit
+    bool properAlloc = false;
+    // get index range using size and start index indicated in inodes
+    // int tempUsedSize = bitset<8>(tempSuperblock.inode[40].used_size).set(7, 0).to_ulong();
+
+    // cout << "tempUsedSize: " << tempUsedSize << endl;
+
+    for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
+    {
+      // int tempUsedSize = (int) bitset<8>(tempSuperblock.inode[i].used_size).set(7, 0).to_ulong();
+      // cout << "check for block number " << freeByteCounter << " and inode "<< i << endl;
+      int tempUsedSize, lowerLim, upperLim;
+      tempUsedSize = bitset<8>(tempSuperblock.inode[40].used_size).set(7, 0).to_ulong();;
+      lowerLim = tempSuperblock.inode[i].start_block;
+      if (tempUsedSize > 0)
+      {
+        upperLim = lowerLim + tempUsedSize - 1;
+      } else
+      {
+        upperLim = 0;
+      }
+
+      // cout << "tempUsedSize" << tempUsedSize << endl;
+      // cout << "lowerLim" << lowerLim << endl;
+      // cout << "upperLim" << upperLim << endl;
+
+      if (curByte[bitIdx])
+      {
+        if ((freeByteCounter >= lowerLim) && (freeByteCounter <= upperLim))
+        {
+          if (!properAlloc)
+          {
+            properAlloc = true;
+          }
+          else // block is used by more than one file
+          {
+            properAlloc = false;
+            break;
+          }
+        }
+      }
+      else // if block is supposed to be free
+      {
+        // printf("here");
+        if ((freeByteCounter >= lowerLim) && (freeByteCounter <= upperLim))
+        {
+          properAlloc = false;
+          break;
+        }
+        else
+        {
+          properAlloc = true;
+        }
+      }
+    }
+
+    if (!properAlloc)
+    {
+      consistent = false;
+      inconsistency = 1;
+      break;
+    }
+
+    freeByteCounter++;
+  }
+
+  if (!consistent)
+  {
+    fprintf(stderr, "Error: File system in %s is inconsistent (error code: %d)\n", new_disk_name, inconsistency);
+    close(fd);
+    return;
+  }
+  /* END CONSISTENCY CHECK 1 */
+
+  /* CONSISTENCY CHECK 2 */
+  // Add all names to vector and check if name already in vector before adding
+
+  /* END CONSISTENCY CHECK 2 */
+  // Consistent?
+  if (!consistent)
+  {
+    fprintf(stderr, "Error: File system in %s is inconsistent (error code: %d)\n", new_disk_name, inconsistency);
+  }
+  else
+  {
+    superblock = &tempSuperblock;
+    dup2(fd, fsfd);
+    fsMounted = true;
+  }
+  close(fd);
 }
 
 void fs_create(char name[5], int size)
@@ -162,8 +307,8 @@ int main(int argc, char **argv)
     }
     else if (strcmp(tokArgs[0], "D") == 0)
     {
-      // Should only have two args
-      if (tokArgs[3] != NULL || tokArgs[1] == NULL)
+      // Should only have one arg
+      if (tokArgs[2] != NULL || tokArgs[1] == NULL)
       {
         fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
       }
@@ -245,6 +390,64 @@ int main(int argc, char **argv)
         fs_write(tokArgs[1], atoi(tokArgs[2]));
       }
     }
+    else if (strcmp(tokArgs[0], "L") == 0)
+    {
+      // Should have no args
+      if (tokArgs[1] != NULL)
+      {
+        fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
+      }
+      else
+      {
+        fs_ls();
+      }
+    }
+    else if (strcmp(tokArgs[0], "E") == 0)
+    {
+      // Should only have two args
+      if (tokArgs[3] != NULL || tokArgs[1] == NULL || tokArgs[2] == NULL)
+      {
+        fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
+      }
+      // Check if filename longer than 5 chars
+      else if (strlen(tokArgs[1]) > 5)
+      {
+        fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
+      }
+      else
+      {
+        fs_resize(tokArgs[1], atoi(tokArgs[2]));
+      }
+    }
+    else if (strcmp(tokArgs[0], "O") == 0)
+    {
+      // Should have no args
+      if (tokArgs[1] != NULL)
+      {
+        fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
+      }
+      else
+      {
+        fs_defrag();
+      }
+    }
+    else if (strcmp(tokArgs[0], "Y") == 0)
+    {
+      // Should only have one arg
+      if (tokArgs[2] != NULL || tokArgs[1] == NULL)
+      {
+        fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
+      }
+      // Check if filename longer than 5 chars
+      else if (strlen(tokArgs[1]) > 5)
+      {
+        fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
+      }
+      else
+      {
+        fs_delete(tokArgs[1]);
+      }
+    }
     else
     {
       // Not valid command
@@ -257,6 +460,12 @@ int main(int argc, char **argv)
 
   // Close input file
   fclose(fp);
+
+  // Close mounted disk file if open
+  if (fsMounted)
+  {
+    close(fsfd);
+  }
 
   return 0;
 }

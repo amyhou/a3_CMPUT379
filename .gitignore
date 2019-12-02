@@ -2,5 +2,7 @@
 a3-starter-code/
 sample_tests/
 
+fs
+disk*
 *.o
 *.txt
