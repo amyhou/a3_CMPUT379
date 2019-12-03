@@ -243,10 +243,11 @@ void fs_mount(char *new_disk_name)
   /* END CONSISTENCY CHECK 2 */
   /* CONSISTENCY CHECK 3 */
   vector<int> availableInodes;
+	vector<int> unavailableInodes;
   for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
   {
     // Check if inode is marked "in use"
-    bitset<8> tempBitset = bitset<8>((int)tempSuperblock.inode[i].used_size);
+    bitset<8> tempBitset = bitset<8>(tempSuperblock.inode[i].used_size);
     if (tempBitset[7] == 0)
     {
       // Make sure all members of inode struct are 0
@@ -267,7 +268,6 @@ void fs_mount(char *new_disk_name)
 
       // add to free inodes list
       availableInodes.push_back(i);
-      sort(availableInodes.begin(), availableInodes.end());
     }
     else
     {
@@ -282,6 +282,7 @@ void fs_mount(char *new_disk_name)
           inconsistency = 3;
           break;
       }
+			unavailableInodes.push_back(i);
     }
   }
   if (!consistent)
@@ -291,16 +292,65 @@ void fs_mount(char *new_disk_name)
     return;
   }
   /* END CONSISTENCY CHECK 3 */
-  /* CONSISTENCY CHECK 4 */
+  /* CONSISTENCY CHECKS 4, 5, and 6*/
+	for (int i = 0; i < unavailableInodes.size(); i++)
+	{
+		// Check if inode is marked "in use"
+		uint8_t tempDirParent = tempSuperblock.inode[unavailableInodes[i]].dir_parent;
+		bitset<8> tempBitset = bitset<8>((int)tempDirParent);
+		if (!tempBitset[7]) // is file, start_block must be between 1 and 127
+		{
+			// cout << "is file: " << endl;
+			// cout << "start_block" << tempSuperblock.inode[unavailableInodes[i]].start_block << endl;
 
-  /* END CONSISTENCY CHECK 4 */
+			if ((tempSuperblock.inode[unavailableInodes[i]].start_block < 1) ||
+					(tempSuperblock.inode[unavailableInodes[i]].start_block > 127))
+			{
+				consistent = false;
+				inconsistency = 4;
+				break;
+			}
+		}
+		else // is dir, size and start_block must both be 0
+		{
+			// cout << "is directory: " << endl;
+			// cout << "start_block" << tempSuperblock.inode[unavailableInodes[i]].start_block << endl;
+			// cout << "used_size" << tempSuperblock.inode[unavailableInodes[i]].used_size << endl;
+			if ((tempSuperblock.inode[unavailableInodes[i]].used_size != 0) ||
+					(tempSuperblock.inode[unavailableInodes[i]].start_block != 0))
+			{
+				consistent = false;
+				inconsistency = 5;
+			}
+		}
+		int tempParentNodeIdx = (int) (tempDirParent & 0x7F);
+		if ( (tempParentNodeIdx != 127) && ( (tempParentNodeIdx < 0) || (tempParentNodeIdx > 125) ) )
+		{
+			// not valid parent inode index
+		}
+		else
+		{
+			// check if parent inode is in use and marked as directory
+		}
+	}
 
-  // We've come this far... time to actually start using the disk for real!
+	if (!consistent)
+	{
+		fprintf(stderr, "Error: File system in %s is inconsistent (error code: %d)\n", new_disk_name, inconsistency);
+		close(fd);
+		return;
+	}
+  /* END CONSISTENCY CHECK 4, 5 and 6*/
+
+  // We've come this far... time to actually mount and start using the disk for real!
   superblock = tempSuperblock;
   info.directories = dirNames;
   info.freeInodeIndexes = availableInodes;
+	lseek(fd, 0, SEEK_SET); // return fp to point to beginning of file because why not?
   dup2(fd, fsfd);
   fsMounted = true;
+
+	close(fd); // close temp fp
 
 }
 
