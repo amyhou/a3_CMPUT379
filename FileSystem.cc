@@ -196,21 +196,14 @@ void fs_mount(char *new_disk_name)
   /* CONSISTENCY CHECK 2 */
   // For each dir, add all names to vector and check if name already in vector before adding
   map<int, vector<string> > dirNames;
-  vector<int> availableInodes;
+
   for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
   {
     // Check if inode is marked "in use"
     bitset<8> tempBitset = bitset<8>((int)tempSuperblock.inode[i].used_size);
     if (tempBitset[7] == 0)
     {
-      // add to free inodes list
-      availableInodes.push_back(i);
-      sort(availableInodes.begin(), availableInodes.end());
       continue;
-    }
-    else
-    {
-      cout << tempBitset[7] << endl;
     }
 
     // Use a multimap Map<directory number, vector <string>>
@@ -249,22 +242,66 @@ void fs_mount(char *new_disk_name)
   }
   /* END CONSISTENCY CHECK 2 */
   /* CONSISTENCY CHECK 3 */
+  vector<int> availableInodes;
+  for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
+  {
+    // Check if inode is marked "in use"
+    bitset<8> tempBitset = bitset<8>((int)tempSuperblock.inode[i].used_size);
+    if (tempBitset[7] == 0)
+    {
+      // Make sure all members of inode struct are 0
+      if ((tempSuperblock.inode[i].name[0] != 0) ||
+          (tempSuperblock.inode[i].name[1] != 0) ||
+          (tempSuperblock.inode[i].name[2] != 0) ||
+          (tempSuperblock.inode[i].name[3] != 0) ||
+          (tempSuperblock.inode[i].name[4] != 0) ||
+          (tempSuperblock.inode[i].used_size != 0) ||
+          (tempSuperblock.inode[i].start_block != 0) ||
+          (tempSuperblock.inode[i].dir_parent != 0)
+          )
+      {
+          consistent = false;
+          inconsistency = 3;
+          break;
+      }
 
-  /* END CONSISTENCY CHECK 3 */
-  // Consistent?
+      // add to free inodes list
+      availableInodes.push_back(i);
+      sort(availableInodes.begin(), availableInodes.end());
+    }
+    else
+    {
+      if ((tempSuperblock.inode[i].name[0] == 0) &&
+          (tempSuperblock.inode[i].name[1] == 0) &&
+          (tempSuperblock.inode[i].name[2] == 0) &&
+          (tempSuperblock.inode[i].name[3] == 0) &&
+          (tempSuperblock.inode[i].name[4] == 0)
+          )
+      {
+          consistent = false;
+          inconsistency = 3;
+          break;
+      }
+    }
+  }
   if (!consistent)
   {
     fprintf(stderr, "Error: File system in %s is inconsistent (error code: %d)\n", new_disk_name, inconsistency);
+    close(fd);
+    return;
   }
-  else
-  {
-    superblock = tempSuperblock;
-    info.directories = dirNames;
-    info.freeInodeIndexes = availableInodes;
-    dup2(fd, fsfd);
-    fsMounted = true;
-  }
-  close(fd);
+  /* END CONSISTENCY CHECK 3 */
+  /* CONSISTENCY CHECK 4 */
+
+  /* END CONSISTENCY CHECK 4 */
+
+  // We've come this far... time to actually start using the disk for real!
+  superblock = tempSuperblock;
+  info.directories = dirNames;
+  info.freeInodeIndexes = availableInodes;
+  dup2(fd, fsfd);
+  fsMounted = true;
+
 }
 
 void fs_create(char name[5], int size)
