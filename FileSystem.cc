@@ -32,6 +32,7 @@ int fsfd;              // file descriptor of emulator disk file currently mounte
 Super_block superblock; // superblock of disk file currently mounted
 Info info;
 bool fsMounted = false;
+int currWorkDir;
 
 
 /* FUNCTION DEFINITIONS */
@@ -327,10 +328,27 @@ void fs_mount(char *new_disk_name)
 		if ( (tempParentNodeIdx != 127) && ( (tempParentNodeIdx < 0) || (tempParentNodeIdx > 125) ) )
 		{
 			// not valid parent inode index
+		  consistent = false;
+		  if (inconsistency == 0)
+		  {
+		    inconsistency = 6;
+		  }
 		}
-		else
+		else if (tempParentNodeIdx != 127)
 		{
 			// check if parent inode is in use and marked as directory
+		  bitset<8> tempParentDirParent = bitset<8>((int)tempSuperblock.inode[tempParentNodeIdx].dir_parent);
+		  bitset<8> tempParentUsedSize = bitset<8>((int)tempSuperblock.inode[tempParentNodeIdx].used_size);
+		  
+		  if ( (!tempParentUsedSize[7]) || (!tempParentUsedSize[7]) )
+		  {
+		    consistent = false;
+        if (inconsistency == 0)
+        {
+          inconsistency = 6;
+        }
+		  }
+		  
 		}
 	}
 
@@ -349,6 +367,7 @@ void fs_mount(char *new_disk_name)
 	lseek(fd, 0, SEEK_SET); // return fp to point to beginning of file because why not?
   dup2(fd, fsfd);
   fsMounted = true;
+  currWorkDir = 127; // set working directory to root
 
 	close(fd); // close temp fp
 
@@ -356,47 +375,83 @@ void fs_mount(char *new_disk_name)
 
 void fs_create(char name[5], int size)
 {
-
+  if (!fsMounted)
+  {
+    fprintf(stderr, "Error: No file system is mounted");
+    return;
+  }
 }
 
 void fs_delete(char name[5])
 {
-
+  if (!fsMounted)
+  {
+    fprintf(stderr, "Error: No file system is mounted");
+    return;
+  }
 }
 
 void fs_read(char name[5], int block_num)
 {
-
+  if (!fsMounted)
+  {
+    fprintf(stderr, "Error: No file system is mounted");
+    return;
+  }
 }
 
 void fs_write(char name[5], int block_num)
 {
-
+  if (!fsMounted)
+  {
+    fprintf(stderr, "Error: No file system is mounted");
+    return;
+  }
 }
 
 void fs_buff(uint8_t buff[1024])
 {
-
+  if (!fsMounted)
+  {
+    fprintf(stderr, "Error: No file system is mounted");
+    return;
+  }
 }
 
 void fs_ls(void)
 {
-
+  if (!fsMounted)
+  {
+    fprintf(stderr, "Error: No file system is mounted");
+    return;
+  }
 }
 
 void fs_resize(char name[5], int new_size)
 {
-
+  if (!fsMounted)
+  {
+    fprintf(stderr, "Error: No file system is mounted");
+    return;
+  }
 }
 
 void fs_defrag(void)
 {
-
+  if (!fsMounted)
+  {
+    fprintf(stderr, "Error: No file system is mounted");
+    return;
+  }
 }
 
 void fs_cd(char name[5])
 {
-
+  if (!fsMounted)
+  {
+    fprintf(stderr, "Error: No file system is mounted");
+    return;
+  }
 }
 
 int main(int argc, char **argv)
