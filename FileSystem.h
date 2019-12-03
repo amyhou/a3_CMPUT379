@@ -13,6 +13,7 @@ typedef struct {
 	Inode inode[126];
 } Super_block;
 
+
 void fs_mount(char *new_disk_name);
 void fs_create(char name[5], int size);
 void fs_delete(char name[5]);
