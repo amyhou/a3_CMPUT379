@@ -27,8 +27,8 @@ using namespace std;
 typedef struct {
   int currWorkDir;
   char *diskName;
-	map<int, vector<string> > directories; // key: parent dir num, val: list of dirs and files inside
-  map<int, vector<int> > dirChildInodes; // key: parent dir num, val: list of dirs and files inside
+	map<int, vector<string> > directories; // key: parent dir num, val: names of items inside
+  map<int, vector<int> > dirChildInodes; // key: parent dir num, val: inode indexes of items inside
   vector<int> freeInodeIndexes; // sorted set of free inodes (sort after each insert)
 } Info;
 
@@ -98,7 +98,7 @@ void setFreeBlockBit(int n, int val)
   // cout << freeByteCounter / 8 << endl;
   curByte = bitset<8>((unsigned char)superblock.free_block_list[n/8]);
 
-  cout << "MSbit: " << curByte[7] << endl;
+  // cout << "MSbit: " << curByte[7] << endl;
   int bitIdx = 7 - modCount;
   curByte[bitIdx] = val;
 
@@ -518,17 +518,8 @@ void fs_create(char name[5], int size)
     bitset<8> curByte;
     while (freeByteCounter < 128)
     {
-      int modCount = freeByteCounter % 8;
-      if (modCount == 0)
-      {
-        // cout << freeByteCounter / 8 << endl;
-        curByte = bitset<8>((unsigned char)superblock.free_block_list[freeByteCounter/8]);
-      }
-
-      int bitIdx = 7 - modCount;
-      // cout << curByte[bitIdx] << endl;
-
-      if (curByte[bitIdx])
+      bool blockInUse = getFreeBlockBit(freeByteCounter);
+      if (blockInUse)
       {
         consecFree = 0;
       }
@@ -566,9 +557,7 @@ void fs_create(char name[5], int size)
       // update superblock's free block list
       for (int j = tempInode.start_block; j < (tempInode.start_block + neededBlocks); j++)
       {
-        curByte = bitset<8>((unsigned char)superblock.free_block_list[j/8]); // get byte containing now used block
-        curByte.set(7-(j%8)); // set now used block as in use
-        superblock.free_block_list[j/8] = (unsigned char)curByte.to_ulong();
+        setFreeBlockBit(j, 1);
       }
 
     }
@@ -608,6 +597,7 @@ void fs_delete(char name[5])
     int fileSize = getFileSize(inodeIndex);
 
     char tempBuff[BLOCK_SIZE];
+    memset(tempBuff, 0, BLOCK_SIZE);
 
     for (int i = 0; i < fileSize; i++)
     {
@@ -673,9 +663,9 @@ void fs_read(char name[5], int block_num)
     return;
   }
 
-  int filesize = getFileSize(inodeIndex);
+  int fileSize = getFileSize(inodeIndex);
 
-  if ( (block_num < 0) || (block_num > (filesize - 1)) )
+  if ( (block_num < 0) || (block_num > (fileSize - 1)) )
   {
     fprintf(stderr, "Error: %s does not have block %d\n", name, block_num);
     return;
@@ -686,7 +676,7 @@ void fs_read(char name[5], int block_num)
 
   lseek(fsfd, BLOCK_SIZE*(startBlockIdx+block_num), SEEK_SET);
   read(fsfd, buffer, BLOCK_SIZE);
-  
+
   cout << "read block, buffer now is: " << buffer << endl;
 
 }
@@ -714,9 +704,9 @@ void fs_write(char name[5], int block_num)
     return;
   }
 
-  int filesize = getFileSize(inodeIndex);
+  int fileSize = getFileSize(inodeIndex);
 
-  if ( (block_num < 0) || (block_num > (filesize - 1)) )
+  if ( (block_num < 0) || (block_num > (fileSize - 1)) )
   {
     fprintf(stderr, "Error: %s does not have block %d\n", name, block_num);
     return;
@@ -745,7 +735,7 @@ void fs_buff(uint8_t buff[BLOCK_SIZE])
   {
     buffer[i] = buff[i];
   }
-  
+
   cout << "new contents of buffer: " << (char*)buffer << endl;
 }
 
@@ -756,14 +746,14 @@ void fs_ls(void)
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
-  
+
   int numChildren, size;
   int parentDir = info.currWorkDir;
-  
+
   // Print . for current directory and number of items inside
   numChildren = info.directories[info.currWorkDir].size() + 2; // number of items inside directory, plus . and ..
   printf("%-5s %3d\n", ".", numChildren);
-  
+
   // Print .. and number of items inside
   // If currWorkDir is not root (127), need to find num of items in parent directory
   if (info.currWorkDir != 127)
@@ -772,7 +762,7 @@ void fs_ls(void)
     numChildren = info.directories[parentDir].size() + 2;
   }
   printf("%-5s %3d\n", "..", numChildren);
-  
+
   // Print name and size for each item in currWorkDir
   for (int i = 0; i < info.dirChildInodes[info.currWorkDir].size(); i++)
   {
@@ -794,13 +784,152 @@ void fs_ls(void)
 
 void fs_resize(char name[5], int new_size)
 {
+  int sharedIdx, inodeIndex, fileSize, startBlockIdx;
   if (!fsMounted)
   {
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
-  
-  
+
+  sharedIdx = getIndexInDir(name);
+
+  if (sharedIdx < 0)
+  {
+    fprintf(stderr, "Error: File %s does not exist\n", name);
+    return;
+  }
+
+  inodeIndex = getInodeIndex(sharedIdx);
+  if (inodeIsDirectory(inodeIndex))
+  {
+    fprintf(stderr, "Error: File %s does not exist\n", name);
+    return;
+  }
+
+  fileSize = getFileSize(inodeIndex);
+  startBlockIdx = getStartBlock(inodeIndex);
+
+  if (new_size == fileSize)
+  {
+    // Already this size, no need to resize
+    return;
+  }
+  else if (new_size < fileSize)
+  {
+    // Delete and zero out blocks from tail of block sequence for this file and update free block list
+    char tempBuff[BLOCK_SIZE];
+    memset(tempBuff, 0, BLOCK_SIZE);
+
+    for (int i = 0; i < fileSize; i++)
+    {
+      if (i >= new_size)
+      {
+        lseek(fsfd, BLOCK_SIZE*(startBlockIdx+i), SEEK_SET);
+        write(fsfd, tempBuff, BLOCK_SIZE);
+        setFreeBlockBit((startBlockIdx+i), 0);
+      }
+    }
+    superblock.inode[inodeIndex].used_size = new_size | 0x80;
+  }
+  else // new_size > fileSize
+  {
+    cout << "new_size > fileSize: " << new_size << " > " << fileSize << endl;
+    int freeByteCounter = startBlockIdx + fileSize;
+    bool saveable = false;
+    int consecFree = 0;
+
+    while (freeByteCounter < 128)
+    {
+      cout << "looking at bit " << freeByteCounter << endl;
+      bool blockInUse = getFreeBlockBit(freeByteCounter);
+      cout << "blockInUse: " << blockInUse << endl;
+      if (blockInUse)
+      {
+        consecFree = 0;
+        break;
+      }
+      else
+      {
+        consecFree++;
+        if (consecFree >= (new_size - fileSize))
+        {
+          saveable = true;
+          break;
+        }
+      }
+      freeByteCounter++;
+    }
+    if (saveable) // can append new blocks to end without moving start_block
+    {
+      cout << "Can append without moving start block" << endl;
+      for (int j = (startBlockIdx+fileSize); j < (startBlockIdx+new_size); j++)
+      {
+        setFreeBlockBit(j, 1);
+      }
+      superblock.inode[inodeIndex].used_size = new_size | 0x80;
+    }
+    else // can't extend; need to move start block
+    {
+      cout << "Cannot append without moving start block" << endl;
+      freeByteCounter = 0;
+      saveable = false;
+      while (freeByteCounter < 128)
+      {
+        bool blockInUse = getFreeBlockBit(freeByteCounter);
+        if (blockInUse)
+        {
+          consecFree = 0;
+        }
+        else
+        {
+          consecFree++;
+          if (consecFree >= new_size)
+          {
+            saveable = true;
+            break;
+          }
+        }
+        freeByteCounter++;
+      }
+
+      if (saveable) // contiguous number of free blocks found
+      {
+        // Copy mem from old start block to new and set free block bits
+        int newStartBlockIdx = freeByteCounter - new_size + 1;
+        cout << "new start block indx " << newStartBlockIdx << endl;
+        char tempBuff[BLOCK_SIZE];
+
+        for (int k = 0; k < fileSize; k++)
+        {
+          lseek(fsfd, BLOCK_SIZE*(startBlockIdx+k), SEEK_SET);
+          read(fsfd, tempBuff, BLOCK_SIZE);
+
+          lseek(fsfd, BLOCK_SIZE*(newStartBlockIdx+k), SEEK_SET);
+          write(fsfd, tempBuff, BLOCK_SIZE);
+        }
+
+        for (int k=0; k < new_size; k++)
+        {
+          setFreeBlockBit((newStartBlockIdx+k), 1);
+        }
+
+        // Clear old mem blocks and free block bits
+        memset(tempBuff, 0, BLOCK_SIZE);
+
+        for (int k = 0; k < fileSize; k++)
+        {
+          lseek(fsfd, BLOCK_SIZE*(startBlockIdx+k), SEEK_SET);
+          write(fsfd, tempBuff, BLOCK_SIZE);
+
+          setFreeBlockBit((startBlockIdx+k), 0);
+        }
+
+        // Update start block and size
+        superblock.inode[inodeIndex].start_block = newStartBlockIdx;
+        superblock.inode[inodeIndex].used_size = new_size | 0x80;
+      }
+    }
+  }
 }
 
 void fs_defrag(void)
@@ -810,6 +939,8 @@ void fs_defrag(void)
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
+
+
 }
 
 void fs_cd(char name[5])
@@ -819,6 +950,48 @@ void fs_cd(char name[5])
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
+
+  if (strcmp(name, ".") == 0) // current directory
+  {
+    // Already there
+    return;
+  }
+  else if (strcmp(name, "..") == 0) // parent directory
+  {
+    if (info.currWorkDir == 127)
+    {
+      // At root; nowhere to go
+      return;
+    }
+    else
+    {
+      // Set current working directory to parent directory of current inode
+      info.currWorkDir = superblock.inode[info.currWorkDir].dir_parent & 0x7F;
+    }
+  }
+  else // child directory (maybe)
+  {
+    int sharedIdx = getIndexInDir(name);
+
+    if (sharedIdx < 0)
+    {
+      fprintf(stderr, "Error: Directory %s does not exist\n", name);
+      return;
+    }
+
+     int inodeIndex = getInodeIndex(sharedIdx);
+
+     // Is it a directory?
+     if (inodeIsDirectory(inodeIndex))
+     {
+       info.currWorkDir = inodeIndex;
+     }
+     else
+     {
+       fprintf(stderr, "Error: Directory %s does not exist\n", name);
+     }
+  }
+
 }
 
 int main(int argc, char **argv)
@@ -920,7 +1093,15 @@ int main(int argc, char **argv)
       }
       else
       {
-        fs_read(tokArgs[1], atoi(tokArgs[2]));
+        int block_num = atoi(tokArgs[2]);
+        if ( (block_num > 126) || (block_num < 0) )
+        {
+          fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
+        }
+        else
+        {
+          fs_read(tokArgs[1], block_num);
+        }
       }
     }
     else if (strcmp(tokArgs[0], "W") == 0)
@@ -937,7 +1118,15 @@ int main(int argc, char **argv)
       }
       else
       {
-        fs_write(tokArgs[1], atoi(tokArgs[2]));
+        int block_num = atoi(tokArgs[2]);
+        if ( (block_num > 126) || (block_num < 0) )
+        {
+          fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
+        }
+        else
+        {
+          fs_write(tokArgs[1], block_num);
+        }
       }
     }
     else if (strcmp(tokArgs[0], "B") == 0)
@@ -987,7 +1176,15 @@ int main(int argc, char **argv)
       }
       else
       {
-        fs_resize(tokArgs[1], atoi(tokArgs[2]));
+        int size = atoi(tokArgs[2]);
+        if (size < 1) // assumption
+        {
+          fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
+        }
+        else
+        {
+          fs_resize(tokArgs[1], size);
+        }
       }
     }
     else if (strcmp(tokArgs[0], "O") == 0)
@@ -1016,7 +1213,7 @@ int main(int argc, char **argv)
       }
       else
       {
-        fs_delete(tokArgs[1]);
+        fs_cd(tokArgs[1]);
       }
     }
     else
