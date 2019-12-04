@@ -15,10 +15,11 @@ using namespace std;
 
 /* Questions
     When do we invalidated a file name such as "\0\0a\0\0"?
+    Will you test with non-number inputs as the "size" arguments?
 */
 
 /* MACROS */
-#define MAX_INPUT_LENGTH (4000)
+#define MAX_INPUT_LENGTH (1050)
 
 
 /* STRUCTURE DEFINITIONS */
@@ -42,36 +43,71 @@ bool fsMounted = false;
 
 /* FUNCTION DEFINITIONS */
 /* Helper Functions */
-void tokenize(char* str, const char* delim, char ** argv) {
-  /**
-   * @brief Tokenize a C string
-   *
-   * @param str - The C string to tokenize
-   * @param delim - The C string containing delimiter character(s)
-   * @param argv - A char* array that will contain the tokenized strings
-   * Make sure that you allocate enough space for the array.
-   */
+
+void bin(char n)
+{
+  // helper function that prints out a byte (8 bits) in hex
+  printf("0x%02x\n", n & 0xFF);
+}
+
+bitset<8> intToBitset(int n)
+{
+  return bitset<8>(n);
+}
+
+void tokenize(char* str, const char* delim, char ** argv)
+{
   char* token;
   token = strtok(str, delim);
+
+  // If updating buffer, everything following 'B' is part of input to buffer
+  if (strcmp(token, "B") == 0)
+  {
+    argv[0] = token;
+    token = strtok(NULL, "");
+    argv[1] = token;
+    return;
+  }
+
+  // Otherwise, split into arguments
   for(size_t i = 0; token != NULL; ++i){
     argv[i] = token;
     token = strtok(NULL, delim);
   }
 }
 
-void bin(char n)
+bool getFreeBlockBit(int n)
 {
-  // helper function that prints out a byte (8 bits) in hex
+  bitset<8> curByte;
+  int modCount = n % 8;
+  // cout << freeByteCounter / 8 << endl;
+  curByte = bitset<8>((unsigned char)superblock.free_block_list[n/8]);
 
-  printf("0x%02x\n", n & 0xFF);
+  int bitIdx = 7 - modCount;
+  // cout << curByte[bitIdx] << endl;
+
+  return (curByte[bitIdx]);
 }
 
-// bool inodeInUse(Inode * inode, int inodeIdx)
-// {
-//   // Returns if inode state is free (false) or in use (true)
-//   cout << "in use: " << bitset<8>(inode->used_size)[7] << endl;
-//   return bitset<8>(inode->used_size)[7];
-// }
+void setFreeBlockBit(int n, int val)
+{
+  bitset<8> curByte;
+  int modCount = n % 8;
+
+  // cout << freeByteCounter / 8 << endl;
+  curByte = bitset<8>((unsigned char)superblock.free_block_list[n/8]);
+
+  cout << "MSbit: " << curByte[7] << endl;
+  int bitIdx = 7 - modCount;
+  curByte[bitIdx] = val;
+
+  superblock.free_block_list[n/8] = (unsigned char) curByte.to_ulong();
+}
+
+bool inodeIsDirectory(int inodeIndex)
+{
+  return bitset<8>(superblock.inode[inodeIndex].dir_parent)[7];
+}
 
 
 /* Required Functions */
@@ -104,12 +140,12 @@ void fs_mount(char *new_disk_name)
     int modCount = freeByteCounter % 8;
     if (modCount == 0)
     {
-      cout << freeByteCounter / 8 << endl;
+      // cout << freeByteCounter / 8 << endl;
       curByte = bitset<8>((unsigned char)tempSuperblock.free_block_list[freeByteCounter/8]);
     }
 
     int bitIdx = 7 - modCount;
-    cout << curByte[bitIdx] << endl;
+    // cout << curByte[bitIdx] << endl;
 
     // Superblock must not be free in free_block_list
     if (freeByteCounter == 0)
@@ -138,14 +174,18 @@ void fs_mount(char *new_disk_name)
       // int tempUsedSize = (int) bitset<8>(tempSuperblock.inode[i].used_size).set(7, 0).to_ulong();
       // cout << "check for block number " << freeByteCounter << " and inode "<< i << endl;
       int tempUsedSize, lowerLim, upperLim;
-      tempUsedSize = bitset<8>(tempSuperblock.inode[i].used_size).set(7, 0).to_ulong();
+      tempUsedSize = bitset<8>(tempSuperblock.inode[i].used_size & 0x7F).to_ulong();
       lowerLim = tempSuperblock.inode[i].start_block;
       if (tempUsedSize > 0)
       {
         upperLim = lowerLim + tempUsedSize - 1;
-      } else
+      } else // could be a directory
       {
         upperLim = 0;
+        if (bitset<8>(tempSuperblock.inode[i].dir_parent)[7]) // directory
+        {
+          continue; // skip it as we're checking if marked blocks belong to files
+        }
       }
 
       if (curByte[bitIdx]) // block is in use
@@ -158,7 +198,7 @@ void fs_mount(char *new_disk_name)
           }
           else // block is used by more than one file
           {
-            cout << "block used by more than one file" << endl;
+            // cout << "block used by more than one file" << endl;
             properAlloc = false;
             break;
           }
@@ -198,9 +238,6 @@ void fs_mount(char *new_disk_name)
 
   /* CONSISTENCY CHECK 2 */
   // For each dir, add all names to vector and check if name already in vector before adding
-  // map<int, vector<string> > dirNames;
-  // map<int, vector<int> > dirInodes;
-
   for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
   {
     // Check if inode is marked "in use"
@@ -212,9 +249,9 @@ void fs_mount(char *new_disk_name)
 
     // Use a multimap Map<directory number, vector <string>>
     uint8_t tempDir = tempSuperblock.inode[i].dir_parent & 0x7F;
-    printf("Using inode %d\n", i);
-    bin(tempDir);
-    bin(tempSuperblock.inode[i].used_size);
+    // printf("Using inode %d\n", i);
+    // bin(tempDir);
+    // bin(tempSuperblock.inode[i].used_size);
     char tempName[6] = {tempSuperblock.inode[i].name[0], tempSuperblock.inode[i].name[1], tempSuperblock.inode[i].name[2], tempSuperblock.inode[i].name[3], tempSuperblock.inode[i].name[4], '\0'};
     string strName = string(tempName);
 
@@ -223,7 +260,7 @@ void fs_mount(char *new_disk_name)
       // add parent directory to map
       vector<string> vecName;
       tempInfo.directories[tempDir] = vecName;
-      cout << "strName: " << strName << endl;
+      // cout << "strName: " << strName << endl;
       tempInfo.directories[tempDir].push_back(strName);
 
       vector<int>vecName2;
@@ -241,7 +278,7 @@ void fs_mount(char *new_disk_name)
       }
       else
       {
-        cout << "strName: "<< strName << endl;
+        // cout << "strName: "<< strName << endl;
         tempInfo.directories[tempDir].push_back(strName);
         tempInfo.dirChildInodes[tempDir].push_back(i);
       }
@@ -336,6 +373,7 @@ void fs_mount(char *new_disk_name)
 				inconsistency = 5;
 			}
 		}
+
 		int tempParentNodeIdx = (int) (tempDirParent & 0x7F);
 		if ( (tempParentNodeIdx != 127) && ( (tempParentNodeIdx < 0) || (tempParentNodeIdx > 125) ) )
 		{
@@ -346,13 +384,13 @@ void fs_mount(char *new_disk_name)
 		    inconsistency = 6;
 		  }
 		}
-		else if (tempParentNodeIdx != 127)
+		else if ( (tempParentNodeIdx != 127) && ( (tempParentNodeIdx >= 0) || (tempParentNodeIdx <= 125) ) )
 		{
 			// check if parent inode is in use and marked as directory
 		  bitset<8> tempParentDirParent = bitset<8>((int)tempSuperblock.inode[tempParentNodeIdx].dir_parent);
 		  bitset<8> tempParentUsedSize = bitset<8>((int)tempSuperblock.inode[tempParentNodeIdx].used_size);
 
-		  if ( (!tempParentUsedSize[7]) || (!tempParentUsedSize[7]) )
+		  if ( (!tempParentDirParent[7]) || (!tempParentUsedSize[7]) )
 		  {
 		    consistent = false;
         if (inconsistency == 0)
@@ -360,7 +398,6 @@ void fs_mount(char *new_disk_name)
           inconsistency = 6;
         }
 		  }
-
 		}
 	}
 
@@ -405,7 +442,7 @@ void fs_create(char name[5], int size)
     fprintf(stderr, "Error: Superblock in disk %s is full, cannot create %s\n", info.diskName, name);
   }
 
-  vector<string> tempDirs = info.directories[127];
+  vector<string> tempDirs = info.directories[info.currWorkDir];
   // cout << "length of tempDirs: " << tempDirs.size() << endl;
 
   char tempName[6] = {name[0], name[1], name[2], name[3], name[4], '\0'};
@@ -453,12 +490,12 @@ void fs_create(char name[5], int size)
       int modCount = freeByteCounter % 8;
       if (modCount == 0)
       {
-        cout << freeByteCounter / 8 << endl;
+        // cout << freeByteCounter / 8 << endl;
         curByte = bitset<8>((unsigned char)superblock.free_block_list[freeByteCounter/8]);
       }
 
       int bitIdx = 7 - modCount;
-      cout << curByte[bitIdx] << endl;
+      // cout << curByte[bitIdx] << endl;
 
       if (curByte[bitIdx])
       {
@@ -520,13 +557,74 @@ void fs_delete(char name[5])
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
+
+  vector<string>::iterator it = find(info.directories[info.currWorkDir].begin(), info.directories[info.currWorkDir].end(), string(name));
+
+  // Check if specified file or directory is in current working directory
+  if ( it == info.directories[info.currWorkDir].end() )
+  {
+    fprintf(stderr, "Error: File or directory %s does not exist\n", info.diskName);
+    return;
+  }
+
+  // File or dir exists! Time to delete
+  int sharedIdx = distance(info.directories[info.currWorkDir].begin(), it);
+  int inodeIndex = info.dirChildInodes[info.currWorkDir][sharedIdx];
+
+  if (!inodeIsDirectory(inodeIndex))
+  {
+    // Is a file. Need to zero out used mem blocks and update free block list
+    int startBlockIdx = superblock.inode[inodeIndex].start_block;
+    int fileSize = superblock.inode[inodeIndex].used_size & 0x7F;
+
+    char tempBuff[1024];
+
+    for (int i = 0; i < fileSize; i++)
+    {
+      lseek(fsfd, 1024*(startBlockIdx+i), SEEK_SET);
+      write(fsfd, tempBuff, 1024);
+      // cout << "free block bit for " << (startBlockIdx+i) << " is " << (int) getFreeBlockBit((startBlockIdx+i)) << endl;
+      setFreeBlockBit((startBlockIdx+i), 0);
+    }
+  }
+  else // is a directory, need to recursively delete
+  {
+    // update current work directory
+    int tempCurrWorkDir = info.currWorkDir;
+    info.currWorkDir = inodeIndex;
+
+    // get list of names for directory and loop through them with fs_delete
+    for (int i = 0; i < info.directories[info.currWorkDir].size(); i++)
+    {
+      string str = info.directories[info.currWorkDir][i];
+      char tempName[5];
+      strncpy(tempName, str.c_str(), 5);
+      fs_delete(tempName);
+    }
+
+    // restore current work directory
+    info.currWorkDir = tempCurrWorkDir;
+  }
+
+  // Set inode to 0
+  cout << "Clearing inode num " << inodeIndex << endl;
+  memset(&(superblock.inode[inodeIndex]), 0, sizeof(Inode));
+
+  // Update info on directories
+  info.directories[info.currWorkDir].erase(info.directories[info.currWorkDir].begin() + sharedIdx);
+  info.dirChildInodes[info.currWorkDir].erase(info.dirChildInodes[info.currWorkDir].begin() + sharedIdx);
+
+  // Update and sort list of free inodes
+  info.freeInodeIndexes.push_back(inodeIndex);
+  sort(info.freeInodeIndexes.begin(), info.freeInodeIndexes.end());
+
 }
 
 void fs_read(char name[5], int block_num)
 {
   if (!fsMounted)
   {
-    fprintf(stderr, "Error: No file system is mounted");
+    fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
 }
@@ -535,7 +633,7 @@ void fs_write(char name[5], int block_num)
 {
   if (!fsMounted)
   {
-    fprintf(stderr, "Error: No file system is mounted");
+    fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
 }
@@ -544,7 +642,7 @@ void fs_buff(uint8_t buff[1024])
 {
   if (!fsMounted)
   {
-    fprintf(stderr, "Error: No file system is mounted");
+    fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
 }
@@ -553,7 +651,7 @@ void fs_ls(void)
 {
   if (!fsMounted)
   {
-    fprintf(stderr, "Error: No file system is mounted");
+    fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
 }
@@ -562,7 +660,7 @@ void fs_resize(char name[5], int new_size)
 {
   if (!fsMounted)
   {
-    fprintf(stderr, "Error: No file system is mounted");
+    fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
 }
@@ -571,7 +669,7 @@ void fs_defrag(void)
 {
   if (!fsMounted)
   {
-    fprintf(stderr, "Error: No file system is mounted");
+    fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
 }
@@ -580,7 +678,7 @@ void fs_cd(char name[5])
 {
   if (!fsMounted)
   {
-    fprintf(stderr, "Error: No file system is mounted");
+    fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
 }
@@ -704,23 +802,6 @@ int main(int argc, char **argv)
         fs_write(tokArgs[1], atoi(tokArgs[2]));
       }
     }
-    else if (strcmp(tokArgs[0], "W") == 0)
-    {
-      // Should only have two args
-      if (tokArgs[3] != NULL || tokArgs[1] == NULL || tokArgs[2] == NULL)
-      {
-        fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
-      }
-      // Check if filename longer than 5 chars
-      else if (strlen(tokArgs[1]) > 5)
-      {
-        fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
-      }
-      else
-      {
-        fs_write(tokArgs[1], atoi(tokArgs[2]));
-      }
-    }
     else if (strcmp(tokArgs[0], "B") == 0)
     {
       // Should only have two args
@@ -729,7 +810,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
       }
       // Check if filename longer than 5 chars
-      else if (strlen(tokArgs[1]) > 5)
+      else if (strlen(tokArgs[1]) > 1024)
       {
         fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
       }

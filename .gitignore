@@ -1,6 +1,7 @@
 # Don't track these
 a3-starter-code/
 sample_tests/
+consistency-check/
 
 fs
 disk*
