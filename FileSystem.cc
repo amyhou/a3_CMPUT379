@@ -686,6 +686,8 @@ void fs_read(char name[5], int block_num)
 
   lseek(fsfd, BLOCK_SIZE*(startBlockIdx+block_num), SEEK_SET);
   read(fsfd, buffer, BLOCK_SIZE);
+  
+  cout << "read block, buffer now is: " << buffer << endl;
 
 }
 
@@ -724,7 +726,7 @@ void fs_write(char name[5], int block_num)
   int startBlockIdx = getStartBlock(inodeIndex);
 
   lseek(fsfd, BLOCK_SIZE*(startBlockIdx+block_num), SEEK_SET);
-  write(fsfd, buffer, BLOCK_SIZE);
+  write(fsfd, &buffer, BLOCK_SIZE);
 }
 
 void fs_buff(uint8_t buff[BLOCK_SIZE])
@@ -736,10 +738,14 @@ void fs_buff(uint8_t buff[BLOCK_SIZE])
   }
 
   // Flush buffer
-  memset(buffer, 0, sizeof(buffer));
+  memset(buffer, 0, sizeof(buffer)/sizeof(uint8_t));
 
   // Write new bytes into buffer
-  memcpy(buffer, buff, BLOCK_SIZE);
+  for(int i=0; buff[i] != '\0'; i++)
+  {
+    buffer[i] = buff[i];
+  }
+  
   cout << "new contents of buffer: " << (char*)buffer << endl;
 }
 
@@ -750,6 +756,40 @@ void fs_ls(void)
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
+  
+  int numChildren, size;
+  int parentDir = info.currWorkDir;
+  
+  // Print . for current directory and number of items inside
+  numChildren = info.directories[info.currWorkDir].size() + 2; // number of items inside directory, plus . and ..
+  printf("%-5s %3d\n", ".", numChildren);
+  
+  // Print .. and number of items inside
+  // If currWorkDir is not root (127), need to find num of items in parent directory
+  if (info.currWorkDir != 127)
+  {
+    parentDir = superblock.inode[info.currWorkDir].dir_parent & 0x7F;
+    numChildren = info.directories[parentDir].size() + 2;
+  }
+  printf("%-5s %3d\n", "..", numChildren);
+  
+  // Print name and size for each item in currWorkDir
+  for (int i = 0; i < info.dirChildInodes[info.currWorkDir].size(); i++)
+  {
+    int child = info.dirChildInodes[info.currWorkDir][i];
+    if (inodeIsDirectory(child))
+    {
+      // Is directory, find number of items inside it
+      numChildren = info.directories[child].size() + 2;
+      printf("%-5s %3d\n", info.directories[info.currWorkDir][i].c_str(), numChildren);
+    }
+    else
+    {
+      // Is file, get file size
+      size = getFileSize(child);
+      printf("%-5s %3d KB\n", info.directories[info.currWorkDir][i].c_str(), size);
+    }
+  }
 }
 
 void fs_resize(char name[5], int new_size)
@@ -759,6 +799,8 @@ void fs_resize(char name[5], int new_size)
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
+  
+  
 }
 
 void fs_defrag(void)
