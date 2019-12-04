@@ -50,6 +50,11 @@ void bin(char n)
   printf("0x%02x\n", n & 0xFF);
 }
 
+bitset<8> intToBitset(int n)
+{
+  return bitset<8>(n);
+}
+
 void tokenize(char* str, const char* delim, char ** argv)
 {
   char* token;
@@ -160,26 +165,23 @@ void fs_mount(char *new_disk_name)
 
   /* CONSISTENCY CHECK 1 */
   int freeByteCounter = 0;
-  // bitset<8> curByte;
+  bitset<8> curByte;
   while (freeByteCounter < 128)
   {
-    // int modCount = freeByteCounter % 8;
-    // if (modCount == 0)
-    // {
-    //   // cout << freeByteCounter / 8 << endl;
-    //   curByte = bitset<8>((unsigned char)tempSuperblock.free_block_list[freeByteCounter/8]);
-    // }
-    //
-    // int bitIdx = 7 - modCount;
-    // // cout << curByte[bitIdx] << endl;
+    int modCount = freeByteCounter % 8;
+    if (modCount == 0)
+    {
+      // cout << freeByteCounter / 8 << endl;
+      curByte = bitset<8>((unsigned char)tempSuperblock.free_block_list[freeByteCounter/8]);
+    }
 
-    bool blockInUse = getFreeBlockBit(freeByteCounter);
+    int bitIdx = 7 - modCount;
+    // cout << curByte[bitIdx] << endl;
 
     // Superblock must not be free in free_block_list
     if (freeByteCounter == 0)
     {
-      // if (curByte[bitIdx])
-      if (blockInUse)
+      if (curByte[bitIdx])
       {
         freeByteCounter++;
         continue;
@@ -217,7 +219,7 @@ void fs_mount(char *new_disk_name)
         }
       }
 
-      if (blockInUse) // block is in use
+      if (curByte[bitIdx]) // block is in use
       {
         if ((freeByteCounter >= lowerLim) && (freeByteCounter <= upperLim))
         {
@@ -513,24 +515,20 @@ void fs_create(char name[5], int size)
     int freeByteCounter = 0;
     int consecFree = 0;
     bool saveable = false;
-    // bitset<8> curByte;
-    bool blockInUse;
+    bitset<8> curByte;
     while (freeByteCounter < 128)
     {
-      // int modCount = freeByteCounter % 8;
-      // if (modCount == 0)
-      // {
-      //   // cout << freeByteCounter / 8 << endl;
-      //   curByte = bitset<8>((unsigned char)superblock.free_block_list[freeByteCounter/8]);
-      // }
+      int modCount = freeByteCounter % 8;
+      if (modCount == 0)
+      {
+        // cout << freeByteCounter / 8 << endl;
+        curByte = bitset<8>((unsigned char)superblock.free_block_list[freeByteCounter/8]);
+      }
 
-      // int bitIdx = 7 - modCount;
+      int bitIdx = 7 - modCount;
       // cout << curByte[bitIdx] << endl;
 
-      blockInUse = getFreeBlockBit(freeByteCounter);
-
-      // if (curByte[bitIdx])
-      if (blockInUse)
+      if (curByte[bitIdx])
       {
         consecFree = 0;
       }
@@ -688,7 +686,7 @@ void fs_read(char name[5], int block_num)
 
   lseek(fsfd, BLOCK_SIZE*(startBlockIdx+block_num), SEEK_SET);
   read(fsfd, buffer, BLOCK_SIZE);
-
+  
   cout << "read block, buffer now is: " << buffer << endl;
 
 }
@@ -747,7 +745,7 @@ void fs_buff(uint8_t buff[BLOCK_SIZE])
   {
     buffer[i] = buff[i];
   }
-
+  
   cout << "new contents of buffer: " << (char*)buffer << endl;
 }
 
@@ -758,14 +756,14 @@ void fs_ls(void)
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
-
+  
   int numChildren, size;
   int parentDir = info.currWorkDir;
-
+  
   // Print . for current directory and number of items inside
   numChildren = info.directories[info.currWorkDir].size() + 2; // number of items inside directory, plus . and ..
   printf("%-5s %3d\n", ".", numChildren);
-
+  
   // Print .. and number of items inside
   // If currWorkDir is not root (127), need to find num of items in parent directory
   if (info.currWorkDir != 127)
@@ -774,7 +772,7 @@ void fs_ls(void)
     numChildren = info.directories[parentDir].size() + 2;
   }
   printf("%-5s %3d\n", "..", numChildren);
-
+  
   // Print name and size for each item in currWorkDir
   for (int i = 0; i < info.dirChildInodes[info.currWorkDir].size(); i++)
   {
@@ -801,8 +799,8 @@ void fs_resize(char name[5], int new_size)
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
-
-
+  
+  
 }
 
 void fs_defrag(void)
