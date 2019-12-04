@@ -13,6 +13,9 @@
 
 using namespace std;
 
+/* Questions
+    When do we invalidated a file name such as "\0\0a\0\0"?
+*/
 
 /* MACROS */
 #define MAX_INPUT_LENGTH (4000)
@@ -21,7 +24,10 @@ using namespace std;
 /* STRUCTURE DEFINITIONS */
 /* Struct for additional info about disk file */
 typedef struct {
+  int currWorkDir;
+  char *diskName;
 	map<int, vector<string> > directories; // key: parent dir num, val: list of dirs and files inside
+  map<int, vector<int> > dirChildInodes; // key: parent dir num, val: list of dirs and files inside
   vector<int> freeInodeIndexes; // sorted set of free inodes (sort after each insert)
 } Info;
 
@@ -32,7 +38,6 @@ int fsfd;              // file descriptor of emulator disk file currently mounte
 Super_block superblock; // superblock of disk file currently mounted
 Info info;
 bool fsMounted = false;
-int currWorkDir;
 
 
 /* FUNCTION DEFINITIONS */
@@ -84,6 +89,7 @@ void fs_mount(char *new_disk_name)
   // Consistency checks
   bool consistent = true;
   Super_block tempSuperblock;
+  Info tempInfo;
   int inconsistency = 0;
 
   read(fd, &(tempSuperblock), 1024);
@@ -132,7 +138,7 @@ void fs_mount(char *new_disk_name)
       // int tempUsedSize = (int) bitset<8>(tempSuperblock.inode[i].used_size).set(7, 0).to_ulong();
       // cout << "check for block number " << freeByteCounter << " and inode "<< i << endl;
       int tempUsedSize, lowerLim, upperLim;
-      tempUsedSize = bitset<8>(tempSuperblock.inode[40].used_size).set(7, 0).to_ulong();
+      tempUsedSize = bitset<8>(tempSuperblock.inode[i].used_size).set(7, 0).to_ulong();
       lowerLim = tempSuperblock.inode[i].start_block;
       if (tempUsedSize > 0)
       {
@@ -142,11 +148,7 @@ void fs_mount(char *new_disk_name)
         upperLim = 0;
       }
 
-      // cout << "tempUsedSize" << tempUsedSize << endl;
-      // cout << "lowerLim" << lowerLim << endl;
-      // cout << "upperLim" << upperLim << endl;
-
-      if (curByte[bitIdx])
+      if (curByte[bitIdx]) // block is in use
       {
         if ((freeByteCounter >= lowerLim) && (freeByteCounter <= upperLim))
         {
@@ -156,6 +158,7 @@ void fs_mount(char *new_disk_name)
           }
           else // block is used by more than one file
           {
+            cout << "block used by more than one file" << endl;
             properAlloc = false;
             break;
           }
@@ -163,7 +166,6 @@ void fs_mount(char *new_disk_name)
       }
       else // if block is supposed to be free
       {
-        // printf("here");
         if ((freeByteCounter >= lowerLim) && (freeByteCounter <= upperLim))
         {
           properAlloc = false;
@@ -196,7 +198,8 @@ void fs_mount(char *new_disk_name)
 
   /* CONSISTENCY CHECK 2 */
   // For each dir, add all names to vector and check if name already in vector before adding
-  map<int, vector<string> > dirNames;
+  // map<int, vector<string> > dirNames;
+  // map<int, vector<int> > dirInodes;
 
   for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
   {
@@ -208,22 +211,29 @@ void fs_mount(char *new_disk_name)
     }
 
     // Use a multimap Map<directory number, vector <string>>
-    uint8_t tempDir = tempSuperblock.inode[i].dir_parent;
+    uint8_t tempDir = tempSuperblock.inode[i].dir_parent & 0x7F;
     printf("Using inode %d\n", i);
     bin(tempDir);
     bin(tempSuperblock.inode[i].used_size);
-    string strName(tempSuperblock.inode[i].name);
-    if (dirNames.find(tempDir) == dirNames.end())
+    char tempName[6] = {tempSuperblock.inode[i].name[0], tempSuperblock.inode[i].name[1], tempSuperblock.inode[i].name[2], tempSuperblock.inode[i].name[3], tempSuperblock.inode[i].name[4], '\0'};
+    string strName = string(tempName);
+
+    if (tempInfo.directories.find(tempDir) == tempInfo.directories.end())
     {
       // add parent directory to map
       vector<string> vecName;
-      dirNames[tempDir] = vecName;
-      dirNames[tempDir].push_back(strName);
+      tempInfo.directories[tempDir] = vecName;
+      cout << "strName: " << strName << endl;
+      tempInfo.directories[tempDir].push_back(strName);
+
+      vector<int>vecName2;
+      tempInfo.dirChildInodes[tempDir] = vecName2;
+      tempInfo.dirChildInodes[tempDir].push_back(i);
     }
     else
     {
       // parent directory already a key; check if name in vector and append if not
-      if (find(dirNames[tempDir].begin(), dirNames[tempDir].end(), strName) != dirNames[tempDir].end())
+      if (find(tempInfo.directories[tempDir].begin(), tempInfo.directories[tempDir].end(), strName) != tempInfo.directories[tempDir].end())
       {
         consistent = false;
         inconsistency = 2;
@@ -231,7 +241,9 @@ void fs_mount(char *new_disk_name)
       }
       else
       {
-        dirNames[tempDir].push_back(strName);
+        cout << "strName: "<< strName << endl;
+        tempInfo.directories[tempDir].push_back(strName);
+        tempInfo.dirChildInodes[tempDir].push_back(i);
       }
     }
   }
@@ -268,7 +280,7 @@ void fs_mount(char *new_disk_name)
       }
 
       // add to free inodes list
-      availableInodes.push_back(i);
+      tempInfo.freeInodeIndexes.push_back(i);
     }
     else
     {
@@ -296,13 +308,13 @@ void fs_mount(char *new_disk_name)
   /* CONSISTENCY CHECKS 4, 5, and 6*/
 	for (int i = 0; i < unavailableInodes.size(); i++)
 	{
-		// Check if inode is marked "in use"
+		// Check only for inodes marked "in use"
 		uint8_t tempDirParent = tempSuperblock.inode[unavailableInodes[i]].dir_parent;
-		bitset<8> tempBitset = bitset<8>((int)tempDirParent);
+		bitset<8> tempBitset = bitset<8>(tempDirParent);
 		if (!tempBitset[7]) // is file, start_block must be between 1 and 127
 		{
 			// cout << "is file: " << endl;
-			// cout << "start_block" << tempSuperblock.inode[unavailableInodes[i]].start_block << endl;
+			// cout << "start_block: " << tempSuperblock.inode[unavailableInodes[i]].start_block << endl;
 
 			if ((tempSuperblock.inode[unavailableInodes[i]].start_block < 1) ||
 					(tempSuperblock.inode[unavailableInodes[i]].start_block > 127))
@@ -316,9 +328,9 @@ void fs_mount(char *new_disk_name)
 		{
 			// cout << "is directory: " << endl;
 			// cout << "start_block" << tempSuperblock.inode[unavailableInodes[i]].start_block << endl;
-			// cout << "used_size" << tempSuperblock.inode[unavailableInodes[i]].used_size << endl;
-			if ((tempSuperblock.inode[unavailableInodes[i]].used_size != 0) ||
-					(tempSuperblock.inode[unavailableInodes[i]].start_block != 0))
+			// cout << "used_size" << (int)(tempSuperblock.inode[unavailableInodes[i]].used_size & 0x7F) << endl;
+			if ( ((tempSuperblock.inode[unavailableInodes[i]].used_size & 0x7F) != 0) ||
+					 (tempSuperblock.inode[unavailableInodes[i]].start_block != 0))
 			{
 				consistent = false;
 				inconsistency = 5;
@@ -339,7 +351,7 @@ void fs_mount(char *new_disk_name)
 			// check if parent inode is in use and marked as directory
 		  bitset<8> tempParentDirParent = bitset<8>((int)tempSuperblock.inode[tempParentNodeIdx].dir_parent);
 		  bitset<8> tempParentUsedSize = bitset<8>((int)tempSuperblock.inode[tempParentNodeIdx].used_size);
-		  
+
 		  if ( (!tempParentUsedSize[7]) || (!tempParentUsedSize[7]) )
 		  {
 		    consistent = false;
@@ -348,7 +360,7 @@ void fs_mount(char *new_disk_name)
           inconsistency = 6;
         }
 		  }
-		  
+
 		}
 	}
 
@@ -362,12 +374,15 @@ void fs_mount(char *new_disk_name)
 
   // We've come this far... time to actually mount and start using the disk for real!
   superblock = tempSuperblock;
-  info.directories = dirNames;
-  info.freeInodeIndexes = availableInodes;
 	lseek(fd, 0, SEEK_SET); // return fp to point to beginning of file because why not?
   dup2(fd, fsfd);
   fsMounted = true;
-  currWorkDir = 127; // set working directory to root
+  tempInfo.currWorkDir = 127; // set working directory to root
+  tempInfo.diskName = new_disk_name;
+
+  // cout << "before setting info to tempinfo, tempinfo size is " << tempInfo.directories.size() << endl;
+  info = tempInfo;
+  // cout << "after setting info to tempinfo, info.dir size if " << info.directories.size() << endl;
 
 	close(fd); // close temp fp
 
@@ -375,18 +390,134 @@ void fs_mount(char *new_disk_name)
 
 void fs_create(char name[5], int size)
 {
+
   if (!fsMounted)
   {
-    fprintf(stderr, "Error: No file system is mounted");
+    fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
+  // cout << "from fs_create, currWorkDir is " << info.currWorkDir << endl;
+  // cout << "Elements in directories map: " << info.directories.size() << endl;
+  int neededBlocks = size;
+
+  if (info.freeInodeIndexes.empty())
+  {
+    fprintf(stderr, "Error: Superblock in disk %s is full, cannot create %s\n", info.diskName, name);
+  }
+
+  vector<string> tempDirs = info.directories[127];
+  // cout << "length of tempDirs: " << tempDirs.size() << endl;
+
+  char tempName[6] = {name[0], name[1], name[2], name[3], name[4], '\0'};
+  // cout << "tempName: " << string(tempName) << endl;
+  if ( (find(tempDirs.begin(), tempDirs.end(), string(tempName)) != tempDirs.end()) ||
+       (strcmp(name, ".") == 0) || (strcmp(name, "..") == 0) )
+  {
+    // not unique name in this directory
+    fprintf(stderr, "Error: File or directory %s already exists\n", name);
+    return;
+  }
+
+  if (size == 0) // creating a directory
+  {
+    // store attributes into first available inode
+    Inode tempInode;
+    for (int i = 0; i < 5; i++)
+    {
+      tempInode.name[i] = name[i];
+    }
+    tempInode.used_size = (uint8_t)size | 0x80;
+    tempInode.dir_parent = info.currWorkDir | 0x80;
+
+    superblock.inode[info.freeInodeIndexes[0]] = tempInode;
+    // update directories info
+    info.directories[info.currWorkDir].push_back((string)name);;
+    info.dirChildInodes[info.currWorkDir].push_back(info.freeInodeIndexes[0]);
+
+    info.freeInodeIndexes.erase(info.freeInodeIndexes.begin());
+  }
+  else if ((size < 0) || (size > 127)) // impossible to store files of size outside [1,127] blocks
+  {
+    fprintf(stderr, "Error: Cannot allocate %d on %s", size, name);
+    return;
+  }
+  else // creating a file. find first set of continuous free blocks that can store file
+  {
+    // Go through free block section and read each bit until N consecutive free blocks are found
+    int freeByteCounter = 0;
+    int consecFree = 0;
+    bool saveable = false;
+    bitset<8> curByte;
+    while (freeByteCounter < 128)
+    {
+      int modCount = freeByteCounter % 8;
+      if (modCount == 0)
+      {
+        cout << freeByteCounter / 8 << endl;
+        curByte = bitset<8>((unsigned char)superblock.free_block_list[freeByteCounter/8]);
+      }
+
+      int bitIdx = 7 - modCount;
+      cout << curByte[bitIdx] << endl;
+
+      if (curByte[bitIdx])
+      {
+        consecFree = 0;
+      }
+      else
+      {
+        consecFree++;
+        if (consecFree >= neededBlocks)
+        {
+          saveable = true;
+          break;
+        }
+      }
+      freeByteCounter++;
+    }
+    if (saveable)
+    {
+      // store attributes into first available inode
+      Inode tempInode;
+      for (int i = 0; i < 5; i++)
+      {
+        tempInode.name[i] = name[i];
+      }
+      tempInode.used_size = (uint8_t)size | 0x80;
+      tempInode.dir_parent = info.currWorkDir & 0x7F;
+      tempInode.start_block = freeByteCounter - neededBlocks + 1;
+
+      superblock.inode[info.freeInodeIndexes[0]] = tempInode;
+
+      // update directories info
+      info.directories[info.currWorkDir].push_back((string)name);;
+      info.dirChildInodes[info.currWorkDir].push_back(info.freeInodeIndexes[0]);
+
+      info.freeInodeIndexes.erase(info.freeInodeIndexes.begin());
+
+      // update superblock's free block list
+      for (int j = tempInode.start_block; j < (tempInode.start_block + neededBlocks); j++)
+      {
+        curByte = bitset<8>((unsigned char)superblock.free_block_list[j/8]); // get byte containing now used block
+        curByte.set(7-(j%8)); // set now used block as in use
+        superblock.free_block_list[j/8] = (unsigned char)curByte.to_ulong();
+      }
+
+    }
+    else
+    {
+      fprintf(stderr, "Error: Cannot allocate %d on %s\n", size, info.diskName);
+      return;
+    }
+  }
+
 }
 
 void fs_delete(char name[5])
 {
   if (!fsMounted)
   {
-    fprintf(stderr, "Error: No file system is mounted");
+    fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
 }
@@ -681,6 +812,8 @@ int main(int argc, char **argv)
   // Close mounted disk file if open
   if (fsMounted)
   {
+    lseek(fsfd, 0, SEEK_SET);
+    write(fsfd, &superblock, 1024);
     close(fsfd);
   }
 
