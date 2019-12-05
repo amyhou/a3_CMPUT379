@@ -15,13 +15,12 @@
 using namespace std;
 
 /* Questions
-    When do we invalidated a file name such as "\0\0a\0\0"?
     Will you test with non-number inputs as the "size" arguments?
 */
 
 /* MACROS */
-#define MAX_INPUT_LENGTH (1050)
-#define BLOCK_SIZE (1024)
+#define MAX_INPUT_LENGTH (1050) // Maximum length of input
+#define BLOCK_SIZE (1024)       // 1 KB
 
 /* STRUCTURE DEFINITIONS */
 /* Struct for additional info about disk file */
@@ -52,7 +51,6 @@ void tokenize(char* str, const char* delim, char ** argv)
   // If updating buffer, everything following 'B' is part of input to buffer
   if (strcmp(token, "B") == 0)
   {
-    // cout << "first was a B" << endl;
     argv[0] = token;
     token = strtok(NULL, "");
     argv[1] = token;
@@ -70,12 +68,8 @@ bool getFreeBlockBit(int n)
 {
   bitset<8> curByte;
   int modCount = n % 8;
-  // cout << freeByteCounter / 8 << endl;
   curByte = bitset<8>((unsigned char)superblock.free_block_list[n/8]);
-
   int bitIdx = 7 - modCount;
-  // cout << curByte[bitIdx] << endl;
-
   return (curByte[bitIdx]);
 }
 
@@ -167,12 +161,10 @@ void fs_mount(char *new_disk_name)
     int modCount = freeByteCounter % 8;
     if (modCount == 0)
     {
-      // cout << freeByteCounter / 8 << endl;
       curByte = bitset<8>((unsigned char)tempSuperblock.free_block_list[freeByteCounter/8]);
     }
 
     int bitIdx = 7 - modCount;
-    // cout << curByte[bitIdx] << endl;
 
     // Superblock must not be free in free_block_list
     if (freeByteCounter == 0)
@@ -191,15 +183,10 @@ void fs_mount(char *new_disk_name)
 
     // If not looking at superblock bit
     bool properAlloc = false;
+    
     // get index range using size and start index indicated in inodes
-    // int tempUsedSize = bitset<8>(tempSuperblock.inode[40].used_size).set(7, 0).to_ulong();
-
-    // cout << "tempUsedSize: " << tempUsedSize << endl;
-
     for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
     {
-      // int tempUsedSize = (int) bitset<8>(tempSuperblock.inode[i].used_size).set(7, 0).to_ulong();
-      // cout << "check for block number " << freeByteCounter << " and inode "<< i << endl;
       int tempUsedSize, lowerLim, upperLim;
       tempUsedSize = bitset<8>(tempSuperblock.inode[i].used_size & 0x7F).to_ulong();
       lowerLim = tempSuperblock.inode[i].start_block;
@@ -285,7 +272,6 @@ void fs_mount(char *new_disk_name)
       // add parent directory to map
       vector<string> vecName;
       tempInfo.directories[tempDir] = vecName;
-      // cout << "strName: " << strName << endl;
       tempInfo.directories[tempDir].push_back(strName);
 
       vector<int>vecName2;
@@ -303,7 +289,6 @@ void fs_mount(char *new_disk_name)
       }
       else
       {
-        // cout << "strName: "<< strName << endl;
         tempInfo.directories[tempDir].push_back(strName);
         tempInfo.dirChildInodes[tempDir].push_back(i);
       }
@@ -375,9 +360,6 @@ void fs_mount(char *new_disk_name)
 		bitset<8> tempBitset = bitset<8>(tempDirParent);
 		if (!tempBitset[7]) // is file, start_block must be between 1 and 127
 		{
-			// cout << "is file: " << endl;
-			// cout << "start_block: " << tempSuperblock.inode[unavailableInodes[i]].start_block << endl;
-
 			if ((tempSuperblock.inode[unavailableInodes[i]].start_block < 1) ||
 					(tempSuperblock.inode[unavailableInodes[i]].start_block > 127))
 			{
@@ -388,9 +370,6 @@ void fs_mount(char *new_disk_name)
 		}
 		else // is dir, size and start_block must both be 0
 		{
-			// cout << "is directory: " << endl;
-			// cout << "start_block" << tempSuperblock.inode[unavailableInodes[i]].start_block << endl;
-			// cout << "used_size" << (int)(tempSuperblock.inode[unavailableInodes[i]].used_size & 0x7F) << endl;
 			if ( ((tempSuperblock.inode[unavailableInodes[i]].used_size & 0x7F) != 0) ||
 					 (tempSuperblock.inode[unavailableInodes[i]].start_block != 0))
 			{
@@ -449,9 +428,7 @@ void fs_mount(char *new_disk_name)
   tempInfo.currWorkDir = 127; // set working directory to root
   tempInfo.diskName = string(new_disk_name);
 
-  // cout << "before setting info to tempinfo, tempinfo size is " << tempInfo.directories.size() << endl;
   info = tempInfo;
-  // cout << "after setting info to tempinfo, info.dir size if " << info.directories.size() << endl;
 
 	close(fd); // close temp fp
 
@@ -465,8 +442,7 @@ void fs_create(char name[5], int size)
     fprintf(stderr, "Error: No file system is mounted\n");
     return;
   }
-  // cout << "from fs_create, currWorkDir is " << info.currWorkDir << endl;
-  // cout << "Elements in directories map: " << info.directories.size() << endl;
+
   int neededBlocks = size;
 
   if (info.freeInodeIndexes.empty())
@@ -475,10 +451,9 @@ void fs_create(char name[5], int size)
   }
 
   vector<string> tempDirs = info.directories[info.currWorkDir];
-  // cout << "length of tempDirs: " << tempDirs.size() << endl;
 
   char tempName[6] = {name[0], name[1], name[2], name[3], name[4], '\0'};
-  // cout << "tempName: " << string(tempName) << endl;
+
   if ( (find(tempDirs.begin(), tempDirs.end(), string(tempName)) != tempDirs.end()) ||
        (strcmp(name, ".") == 0) || (strcmp(name, "..") == 0) )
   {
@@ -499,6 +474,7 @@ void fs_create(char name[5], int size)
     tempInode.dir_parent = info.currWorkDir | 0x80;
 
     superblock.inode[info.freeInodeIndexes[0]] = tempInode;
+    
     // update directories info
     info.directories[info.currWorkDir].push_back((string)name);;
     info.dirChildInodes[info.currWorkDir].push_back(info.freeInodeIndexes[0]);
@@ -606,19 +582,18 @@ void fs_delete(char name[5])
     {
       lseek(fsfd, BLOCK_SIZE*(startBlockIdx+i), SEEK_SET);
       write(fsfd, tempBuff, BLOCK_SIZE);
-      // cout << "free block bit for " << (startBlockIdx+i) << " is " << (int) getFreeBlockBit((startBlockIdx+i)) << endl;
       setFreeBlockBit((startBlockIdx+i), 0);
     }
   }
   else // is a directory, need to recursively delete
   {
     cout << "directory, need to recursively delete" << endl;
+    
     // update current work directory
     int tempCurrWorkDir = info.currWorkDir;
     info.currWorkDir = inodeIndex;
 
     // get list of names for directory and loop through them with fs_delete
-    // for (int i = 0; i < info.directories[info.currWorkDir].size(); i++)
     while (info.directories[info.currWorkDir].size() > 0)
     {
       string str = info.directories[info.currWorkDir][0];
@@ -630,10 +605,8 @@ void fs_delete(char name[5])
     // restore current work directory
     info.currWorkDir = tempCurrWorkDir;
   }
-
-  // Set inode to 0
-  // cout << "Clearing inode num " << inodeIndex << endl;
-  memset(&(superblock.inode[inodeIndex]), 0, sizeof(Inode));
+  
+  memset(&(superblock.inode[inodeIndex]), 0, sizeof(Inode));  // Set inode to 0
 
   // Update info on directories
   info.directories[info.currWorkDir].erase(info.directories[info.currWorkDir].begin() + sharedIdx);
@@ -682,9 +655,6 @@ void fs_read(char name[5], int block_num)
 
   lseek(fsfd, BLOCK_SIZE*(startBlockIdx+block_num), SEEK_SET);
   read(fsfd, &buffer, BLOCK_SIZE);
-
-  // cout << "read block, buffer now is: " << buffer << endl;
-
 }
 
 void fs_write(char name[5], int block_num)
@@ -735,15 +705,13 @@ void fs_buff(uint8_t buff[BLOCK_SIZE])
   }
 
   // Flush buffer
-  memset(buffer, 0, 1024);
+  memset(buffer, 0, BLOCK_SIZE);
 
   // Write new bytes into buffer
   for(int i=0; buff[i] != '\0'; i++)
   {
     buffer[i] = buff[i];
   }
-
-  // cout << "new contents of buffer: " << (char*)buffer << endl;
 }
 
 void fs_ls(void)
@@ -848,16 +816,13 @@ void fs_resize(char name[5], int new_size)
   }
   else // new_size > fileSize
   {
-    // cout << "new_size > fileSize: " << new_size << " > " << fileSize << endl;
     int freeByteCounter = startBlockIdx + fileSize;
     bool saveable = false;
     int consecFree = 0;
 
     while (freeByteCounter < 128)
     {
-      // cout << "looking at bit " << freeByteCounter << endl;
       bool blockInUse = getFreeBlockBit(freeByteCounter);
-      // cout << "blockInUse: " << blockInUse << endl;
       if (blockInUse)
       {
         consecFree = 0;
@@ -876,7 +841,6 @@ void fs_resize(char name[5], int new_size)
     }
     if (saveable) // can append new blocks to end without moving start_block
     {
-      // cout << "Can append without moving start block" << endl;
       for (int j = (startBlockIdx+fileSize); j < (startBlockIdx+new_size); j++)
       {
         setFreeBlockBit(j, 1);
@@ -885,7 +849,6 @@ void fs_resize(char name[5], int new_size)
     }
     else // can't extend; need to move start block
     {
-      // cout << "Cannot append without moving start block" << endl;
       freeByteCounter = 0;
       saveable = false;
       while (freeByteCounter < 128)
@@ -911,7 +874,6 @@ void fs_resize(char name[5], int new_size)
       {
         // Copy mem from old start block to new and set free block bits
         int newStartBlockIdx = freeByteCounter - new_size + 1;
-        // cout << "new start block indx " << newStartBlockIdx << endl;
         char tempBuff[BLOCK_SIZE];
 
         for (int k = 0; k < fileSize; k++)
@@ -977,15 +939,10 @@ void fs_defrag(void)
     int inodeIndex = q.top();
     int startBlockIdx = getStartBlock(inodeIndex);
 
-    // cout << "looking at inode " << inodeIndex << " and startBlockIdx is " << startBlockIdx << endl;
-
     while (firstFreeBlock < startBlockIdx)
     {
-
-      // cout << "firstFreeBlock < startBlockIdx" << endl;
       if (!getFreeBlockBit(firstFreeBlock))
       {
-        // cout << "firstFreeBlock index: " << firstFreeBlock << endl;
         break;
       }
       firstFreeBlock++;
@@ -1079,11 +1036,16 @@ void fs_cd(char name[5])
        fprintf(stderr, "Error: Directory %s does not exist\n", name);
      }
   }
-
 }
 
 int main(int argc, char **argv)
 {
+  if (argc != 2)
+  {
+    fprintf(stderr, "Incorrect number of input files provided\n");
+    return -1;
+  }
+  
   memset(buffer, 0, sizeof(buffer));
 
   char input[MAX_INPUT_LENGTH]; // command from file
@@ -1100,7 +1062,6 @@ int main(int argc, char **argv)
   }
 
   // Read input file line by line
-  // while (fgets(input, sizeof(input), stdin)) {
   while (fgets(input, sizeof(input), fp) != NULL) {
     char *tokArgs[MAX_INPUT_LENGTH] = {NULL};
 
@@ -1241,9 +1202,7 @@ int main(int argc, char **argv)
       else
       {
         uint8_t tempBuff[BLOCK_SIZE];
-        // cout << "tokArgs[1] is: " << tokArgs[1] << endl;
         memcpy(tempBuff, tokArgs[1], BLOCK_SIZE);
-        // cout << "tempBuff is: " << tempBuff << endl;
         fs_buff(tempBuff);
       }
     }
@@ -1318,7 +1277,6 @@ int main(int argc, char **argv)
       // Not valid command
       fprintf(stderr, "Command Error: %s, %d\n", filename, lineCounter);
     }
-
     // increment line counter
     lineCounter++;
   }

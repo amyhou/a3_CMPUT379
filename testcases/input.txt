@@ -6,3 +6,7 @@ C wontwork 0
 C file1 2
 C file3 2
 C file2 2
+C . 0
+C . 1
+C .. 0
+C .. 2
