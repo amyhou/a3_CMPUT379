@@ -7,10 +7,10 @@ OBJECTS = FileSystem.o
 all: fs
 
 clean:
-	rm -f *.o fs.tar.gz fs
+	rm -f *.o fs-sim.tar.gz fs
 
 compress:
-	tar -cvzf fs.tar.gz Makefile *.cc *.h README.*
+	tar -cvzf fs-sim.tar.gz Makefile *.cc *.h README.*
 
 compile: FileSystem.cc
 	$(CC) $(WARN) -c FileSystem.cc

@@ -489,7 +489,7 @@ void fs_create(char name[5], int size)
 
     superblock.inode[info.freeInodeIndexes[0]] = tempInode;
 
-    // update directories info
+    // Update directories info
     info.directories[info.currWorkDir].push_back((string)name);;
     info.dirChildInodes[info.currWorkDir].push_back(info.freeInodeIndexes[0]);
 
