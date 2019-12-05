@@ -890,7 +890,9 @@ void fs_resize(char name[5], int new_size)
       freeByteCounter = 0;
       saveable = false;
 
-      char tempFreeBlockList[16] = superblock.free_block_list;
+      char tempFreeBlockList[16];
+      strncpy(tempFreeBlockList, superblock.free_block_list, 16);
+
       for (int k = 0; k < fileSize; k++)
       {
         setFreeBlockBit((startBlockIdx+k), 0);
@@ -953,7 +955,7 @@ void fs_resize(char name[5], int new_size)
       else
       {
         // Not saveable; restore free block bits and print error message
-        superblock.free_block_list = tempFreeBlockList;
+        strncpy(superblock.free_block_list, tempFreeBlockList, 16);
         fprintf(stderr, "Error: File %s cannot expand to size %d\n", tempName, new_size);
       }
     }

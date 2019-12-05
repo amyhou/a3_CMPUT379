@@ -7,7 +7,7 @@ OBJECTS = FileSystem.o
 all: fs
 
 clean:
-	rm -f *.o fs-sim.tar.gz fs
+	rm -f *.o fs
 
 compress:
 	tar -cvzf fs-sim.tar.gz Makefile *.cc *.h README.*
