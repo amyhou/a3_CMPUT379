@@ -889,6 +889,13 @@ void fs_resize(char name[5], int new_size)
     {
       freeByteCounter = 0;
       saveable = false;
+
+      char tempFreeBlockList[16] = superblock.free_block_list;
+      for (int k = 0; k < fileSize; k++)
+      {
+        setFreeBlockBit((startBlockIdx+k), 0);
+      }
+
       while (freeByteCounter < 128)
       {
         bool blockInUse = getFreeBlockBit(freeByteCounter);
@@ -936,7 +943,7 @@ void fs_resize(char name[5], int new_size)
           lseek(fsfd, BLOCK_SIZE*(startBlockIdx+k), SEEK_SET);
           write(fsfd, tempBuff, BLOCK_SIZE);
 
-          setFreeBlockBit((startBlockIdx+k), 0);
+          // setFreeBlockBit((startBlockIdx+k), 0);
         }
 
         // Update start block and size
@@ -945,7 +952,8 @@ void fs_resize(char name[5], int new_size)
       }
       else
       {
-        // Not saveable; print error message
+        // Not saveable; restore free block bits and print error message
+        superblock.free_block_list = tempFreeBlockList;
         fprintf(stderr, "Error: File %s cannot expand to size %d\n", tempName, new_size);
       }
     }
