@@ -1,0 +1,5 @@
+#!/bin/sh
+
+rm -rf disk1
+./create_fs disk1
+echo "Done!\n"
