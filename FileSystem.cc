@@ -196,7 +196,7 @@ void fs_mount(char *new_disk_name)
     bool properAlloc = false;
 
     // get index range using size and start index indicated in inodes
-    for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
+    for (int i = 0; i < (int)(sizeof(tempSuperblock.inode)/sizeof(Inode)); i++)
     {
       int tempUsedSize, lowerLim, upperLim;
       tempUsedSize = bitset<8>(tempSuperblock.inode[i].used_size & 0x7F).to_ulong();
@@ -262,7 +262,7 @@ void fs_mount(char *new_disk_name)
 
   /* CONSISTENCY CHECK 2 ---------------------------------------------------- */
   // For each dir, check if name already in vector before adding to vector
-  for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
+  for (int i = 0; i < (int)(sizeof(tempSuperblock.inode)/sizeof(Inode)); i++)
   {
     // Check if inode is marked "in use"
     bitset<8> tempBitset = bitset<8>((int)tempSuperblock.inode[i].used_size);
@@ -314,7 +314,7 @@ void fs_mount(char *new_disk_name)
   /* CONSISTENCY CHECK 3 ----------------------------------------------------- */
   vector<int> availableInodes;
 	vector<int> unavailableInodes;
-  for (int i = 0; i < sizeof(tempSuperblock.inode)/sizeof(Inode); i++)
+  for (int i = 0; i < (int)(sizeof(tempSuperblock.inode)/sizeof(Inode)); i++)
   {
     // Check if inode is marked "in use"
     bitset<8> tempBitset = bitset<8>(tempSuperblock.inode[i].used_size);
@@ -363,7 +363,7 @@ void fs_mount(char *new_disk_name)
   }
 
   /* CONSISTENCY CHECKS 4, 5, and 6 ----------------------------------------- */
-	for (int i = 0; i < unavailableInodes.size(); i++)
+	for (int i = 0; i < (int)(unavailableInodes.size()); i++)
 	{
 		// Check only for inodes marked "in use"
 		uint8_t tempDirParent = tempSuperblock.inode[unavailableInodes[i]].dir_parent;
@@ -774,7 +774,7 @@ void fs_ls(void)
   sort(tempChildInodes.begin(), tempChildInodes.end());
 
   // Print name and size for each item in currWorkDir
-  for (int i = 0; i < info.dirChildInodes[info.currWorkDir].size(); i++)
+  for (int i = 0; i < (int)(info.dirChildInodes[info.currWorkDir].size()); i++)
   {
     int child = tempChildInodes[i];
     char * name = superblock.inode[child].name;
