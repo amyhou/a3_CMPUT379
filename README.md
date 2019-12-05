@@ -1,1 +1,1 @@
-# a3_CMPUT379
+# CMPUT 379 Assignment 3: File System Simulator - README
