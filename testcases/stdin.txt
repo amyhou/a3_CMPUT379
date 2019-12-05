@@ -1,0 +1,22 @@
+M disk0
+C fd1 0
+L
+Y fd1
+L
+C file1 2
+B helloworld
+W file1 0
+L
+C file2 1
+C fd2 0
+C file3 2
+L
+D fd2
+L
+D file3
+L
+Y ..
+L
+D fd1
+L
+

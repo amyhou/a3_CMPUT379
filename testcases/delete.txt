@@ -1,0 +1,5 @@
+M disk0
+D file1
+D dne
+D world
+D file1

@@ -1,0 +1,8 @@
+M disk0
+C test 0
+C hello 0
+C world 0
+C wontwork 0
+C file1 2
+C file3 2
+C file2 2

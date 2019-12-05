@@ -1,0 +1,18 @@
+M disk0
+L
+Y .
+L
+Y hello
+L
+Y .
+L
+Y ..
+L
+Y ..
+L
+Y .
+L
+Y file1
+L
+Y world
+L

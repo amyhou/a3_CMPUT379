@@ -6,5 +6,3 @@ consistency-check/
 fs
 disk*
 *.o
-*.txt
-reset

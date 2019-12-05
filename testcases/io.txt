@@ -1,0 +1,10 @@
+M disk0
+R file3 0
+R file3 2
+R file3 1
+B the quick brown fox jumped over the lazy dog
+W file3 0
+R file3 0
+W file3 1
+W file2 0
+W file1 0
