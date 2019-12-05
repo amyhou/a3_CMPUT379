@@ -944,8 +944,6 @@ void fs_resize(char name[5], int new_size)
         {
           lseek(fsfd, BLOCK_SIZE*(startBlockIdx+k), SEEK_SET);
           write(fsfd, tempBuff, BLOCK_SIZE);
-
-          // setFreeBlockBit((startBlockIdx+k), 0);
         }
 
         // Update start block and size

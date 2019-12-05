@@ -1,0 +1,53 @@
+M diskdiskdiskdiskdiskdisk
+
+Y fd1
+C fd1
+C . 0
+C .. 0
+C fd1 0
+C fd2 0
+
+L
+
+C fd1 0
+Y fd1
+
+L
+C file1 1
+C file2 2
+C file3 3
+L
+
+C fd2 0
+
+Y fd2
+C file1 1
+C file2 2
+C file3 3
+L
+D file3
+L
+Y ..
+Y ..
+L
+D fd1
+
+L
+
+M disk2
+L
+C file1 2
+C file2 40
+C file3 40
+C file4 40
+C file5 3
+C fd1 0
+Y fd1
+C file1 2
+L
+
+M diskdiskdiskdiskdiskdisk
+L
+
+M disk2
+L

@@ -1,0 +1,15 @@
+M diskdiskdiskdiskdiskdisk
+
+L
+
+C file2 20
+B this will be deleted from file 2 after resize
+W file2 19
+B this will remain in file 2 after resize
+W file2 0
+
+L
+
+E file2 10
+
+O

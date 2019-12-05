@@ -1,0 +1,33 @@
+M diskdiskdiskdiskdiskdisk
+
+L
+C file1
+B
+B help meeeeeeeeeeeeeee
+C file1 128
+C file12 1
+C file1 2
+C . 1
+C .. 1
+
+W filedihefdosf 0
+W filedne 0
+W file1
+W file1 0
+W file1 1
+W file1 2
+
+B meeeeeeeeeeeeeeehelp
+C file2 125
+W file2 0
+W file2 125
+W file2 124
+R file1 0
+C file3 1
+R filedne 0
+R hello 0
+R file1
+R file1 2
+W file3 0
+
+L

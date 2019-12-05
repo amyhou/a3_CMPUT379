@@ -1,0 +1,9 @@
+M diskdiskdiskdiskdiskdisk
+
+L
+
+B megainput5 file2 buffer
+E file2 30
+W file2 29
+
+L
