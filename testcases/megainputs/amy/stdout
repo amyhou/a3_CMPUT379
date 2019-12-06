@@ -1,0 +1,86 @@
+.       2
+..      2
+.       2
+..      2
+.       3
+..      3
+file0 126 KB
+.       3
+..      3
+file0 126 KB
+.       3
+..      3
+file0 126 KB
+.       4
+..      4
+file0 126 KB
+fd1     2
+.       4
+..      4
+file0  10 KB
+fd1     3
+.       4
+..      4
+file0  50 KB
+fd1     3
+.       4
+..      4
+file0   1 KB
+fd1     2
+.       4
+..      4
+fd1     2
+file0  10 KB
+.       4
+..      4
+fd1     2
+file0  10 KB
+.       4
+..      4
+fd1     2
+file0  10 KB
+del called: current directory is 3
+directory before recur is 4
+iteration is 0
+before recur, file to del: fd1
+before recur, vec size is 2
+del called: current directory is 4
+directory before recur is 6
+iteration is 0
+before recur, file to del: fd1
+before recur, vec size is 2
+del called: current directory is 6
+directory before recur is 8
+directory after recur is 6
+after recur, vec size is 1
+iteration is 1
+before recur, file to del: file0
+before recur, vec size is 1
+del called: current directory is 6
+is file to delete: file0
+after recur, vec size is 0
+directory after recur is 4
+after recur, vec size is 1
+iteration is 1
+before recur, file to del: file0
+before recur, vec size is 1
+del called: current directory is 4
+is file to delete: file0
+after recur, vec size is 0
+directory after recur is 3
+del called: current directory is 3
+is file to delete: file1
+del called: current directory is 3
+is file to delete: file3
+del called: current directory is 3
+is file to delete: file5
+.       6
+..      4
+file0  10 KB
+file2  10 KB
+file4  10 KB
+file6  10 KB
+.       4
+..      4
+file0   1 KB
+fd1     6

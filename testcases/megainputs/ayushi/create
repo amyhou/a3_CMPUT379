@@ -1,0 +1,9 @@
+#!/bin/sh
+
+rm -rf diskdiskdiskdiskdiskdisk
+rm -rf disk2
+rm -f stdout
+rm -f stderr
+
+./create_fs diskdiskdiskdiskdiskdisk
+./create_fs disk2

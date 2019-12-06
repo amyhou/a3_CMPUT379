@@ -1,0 +1,36 @@
+M disk3
+L
+C heloooo 1
+C hey -1
+C hey
+C . 1
+C .. 0
+C file1 128
+L
+C file0 126
+L
+C file1 20
+L
+C file2 20
+L
+C fd1 0
+L
+Y fd1
+C file0 1
+Y ..
+
+B This is block 0 of file0
+B
+W file0
+W file0 -1
+W file0 127
+W fo 7
+W file0 0
+R file0 0
+W file0 125
+W fd1 0
+W . 0
+W .. 0
+R . 0
+R .. 0
+R file 0

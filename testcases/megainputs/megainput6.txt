@@ -1,0 +1,130 @@
+M diskdne
+
+C file1 12
+B hello world
+R file1 1
+W file1 0
+E file1 10
+O
+D file1
+L
+Y .
+
+M disk3
+L
+C heloooo 1
+C hey -1
+C hey
+C . 1
+C .. 0
+C file1 128
+L
+C file0 126
+L
+C file1 20
+L
+C file2 20
+L
+C fd1 0
+L
+Y fd1
+C file0 1
+Y ..
+
+B This is block 0 of file0
+B
+W file0
+W file0 -1
+W file0 127
+W fo 7
+W file0 0
+R file0 0
+W file0 125
+W fd1 0
+W . 0
+W .. 0
+R . 0
+R .. 0
+R file 0
+
+E file0 10
+L
+E file0 50
+L
+B This is last block of file0
+W file0 50
+W file0 49
+
+Y fd1
+C fd1 0
+C file0 10
+B This is 0 block 0
+W file0 0
+B This is 1 block 0
+W file0 9
+L
+Y fd1
+C fd1 0
+C file0 10
+B This is 0 block 1
+W file0 0
+B This is 1 block 1
+W file0 9
+L
+Y fd1
+C fd1 0
+C file0 10
+B This is 0 block 2
+W file0 0
+B This is 1 block 2
+W file0 9
+L
+Y fd1
+C fd1 0
+C file0 10
+B This is 0 block 3
+W file0 0
+B This is 1 block 3
+W file0 9
+L
+Y ..
+Y ..
+D fd1
+C file1 10
+B This is 0 block 0
+W file1 0
+B This is 1 block 0
+W file1 9
+C file2 10
+B This is 0 block 0
+W file2 0
+B This is 1 block 0
+W file2 9
+C file3 10
+B This is 0 block 0
+W file3 0
+B This is 1 block 0
+W file3 9
+C file4 10
+B This is 0 block 0
+W file4 0
+B This is 1 block 0
+W file4 9
+C file5 10
+B This is 0 block 0
+W file5 0
+B This is 1 block 0
+W file5 9
+C file6 10
+B This is 0 block 0
+W file6 0
+B This is 1 block 0
+W file6 9
+D file1
+D file3
+D file5
+O
+Y .
+L
+Y ..
+L

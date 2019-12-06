@@ -1,0 +1,15 @@
+M disk3
+L
+C heloooo 1
+C hey -1
+C hey
+C file1 128
+L
+C file0 127
+L
+C file1 20
+L
+C file2 20
+L
+C fd1 0
+L

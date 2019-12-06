@@ -1,16 +1,13 @@
 M
 M disknotexist
 M diskdiskdiskdiskdiskdisk
-
 L
 D file12
 D file1 0
 D file1
 L
 E file2 127
-E file2 126
 L
-D file2
-O
 
+O
 L
