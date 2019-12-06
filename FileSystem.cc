@@ -989,6 +989,7 @@ void fs_defrag(void)
     int newStartBlockIdx, fileSize;
     int inodeIndex = q.top();
     int startBlockIdx = getStartBlock(inodeIndex);
+    fileSize = getFileSize(inodeIndex);
 
     while (firstFreeBlock < startBlockIdx)
     {
@@ -999,7 +1000,7 @@ void fs_defrag(void)
       firstFreeBlock++;
     }
 
-    if (firstFreeBlock == startBlockIdx) // no need to shift, already at smallest free data block
+    if (firstFreeBlock >= startBlockIdx) // no need to shift, already at smallest free data block
     {
       q.pop();
       firstFreeBlock = startBlockIdx+fileSize;
@@ -1008,7 +1009,6 @@ void fs_defrag(void)
     else
     {
       newStartBlockIdx = firstFreeBlock;
-      fileSize = getFileSize(inodeIndex);
       char tempBuff[BLOCK_SIZE];
 
       // Copy over mem blocks and reset old free block list bits
