@@ -1,5 +1,4 @@
 M diskdne
-
 C file1 12
 B hello world
 R file1 1
@@ -9,7 +8,6 @@ O
 D file1
 L
 Y .
-
 M disk3
 L
 C heloooo 1
@@ -30,7 +28,6 @@ L
 Y fd1
 C file0 1
 Y ..
-
 B This is block 0 of file0
 B
 W file0
@@ -46,7 +43,6 @@ W .. 0
 R . 0
 R .. 0
 R file 0
-
 E file0 10
 L
 E file0 50
@@ -54,7 +50,6 @@ L
 B This is last block of file0
 W file0 50
 W file0 49
-
 Y fd1
 C fd1 0
 C file0 10

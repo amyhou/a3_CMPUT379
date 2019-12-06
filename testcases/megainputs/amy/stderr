@@ -8,18 +8,18 @@ Error: No file system is mounted
 Error: No file system is mounted
 Error: No file system is mounted
 Error: No file system is mounted
+Command Error: ../megainput6.txt, 13
+Command Error: ../megainput6.txt, 14
 Command Error: ../megainput6.txt, 15
-Command Error: ../megainput6.txt, 16
-Command Error: ../megainput6.txt, 17
 Error: File or directory . already exists
 Error: File or directory .. already exists
-Command Error: ../megainput6.txt, 20
+Command Error: ../megainput6.txt, 18
 Error: Cannot allocate 20 on disk3
 Error: Cannot allocate 20 on disk3
+Command Error: ../megainput6.txt, 32
+Command Error: ../megainput6.txt, 33
+Command Error: ../megainput6.txt, 34
 Command Error: ../megainput6.txt, 35
-Command Error: ../megainput6.txt, 36
-Command Error: ../megainput6.txt, 37
-Command Error: ../megainput6.txt, 38
 Error: File fo does not exist
 Error: File fd1 does not exist
 Error: File . does not exist

@@ -572,7 +572,6 @@ void fs_delete(char name[5])
     return;
   }
 
-  cout << "del called: current directory is " << info.currWorkDir << endl;
   int sharedIdx = getIndexInDir(name);
   char tempName[6] = {name[0], name[1], name[2], name[3], name[4], 0};
 
@@ -588,7 +587,6 @@ void fs_delete(char name[5])
 
   if (!inodeIsDirectory(inodeIndex))
   {
-    cout << "is file to delete: " << name << endl;
     // Is a file. Need to zero out used mem blocks and update free block list
     int startBlockIdx = getStartBlock(inodeIndex);
     int fileSize = getFileSize(inodeIndex);
@@ -609,28 +607,19 @@ void fs_delete(char name[5])
     int tempCurrWorkDir = info.currWorkDir;
     info.currWorkDir = inodeIndex;
 
-    cout << "directory before recur is " << info.currWorkDir << endl;
     int itSize = info.directories[info.currWorkDir].size();
+    
     // Get list of names for directory and loop through them with fs_delete
-    // while (info.directories[info.currWorkDir].size() > 0)
     for (int j = 0; j < itSize; j++)
     {
-      cout << "iteration is " << j << endl;
       string str = info.directories[info.currWorkDir][0];
       char tempName[5];
       strncpy(tempName, str.c_str(), 5);
-      cout << "before recur, file to del: " << tempName << endl;
-      cout << "before recur, vec size is " << (int)(info.directories[info.currWorkDir].size()) << endl;
       fs_delete(tempName);
-
-      cout << "after recur, vec size is " << (int)(info.directories[info.currWorkDir].size()) << endl;
-      // info.directories[info.currWorkDir].erase(info.directories[info.currWorkDir].begin());
-      // info.dirChildInodes[info.currWorkDir].erase(info.dirChildInodes[info.currWorkDir].begin());
     }
 
     // Restore current work directory
     info.currWorkDir = tempCurrWorkDir;
-    cout << "directory after recur is " << info.currWorkDir << endl;
   }
 
   memset(&(superblock.inode[inodeIndex]), 0, sizeof(Inode));  // Set inode to 0
