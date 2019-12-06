@@ -224,7 +224,6 @@ void fs_mount(char *new_disk_name)
           }
           else // block is used by more than one file
           {
-            // cout << "block used by more than one file" << endl;
             properAlloc = false;
             break;
           }
@@ -608,7 +607,7 @@ void fs_delete(char name[5])
     info.currWorkDir = inodeIndex;
 
     int itSize = info.directories[info.currWorkDir].size();
-    
+
     // Get list of names for directory and loop through them with fs_delete
     for (int j = 0; j < itSize; j++)
     {
